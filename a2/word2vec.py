@@ -17,7 +17,7 @@ def sigmoid(x):
     """
 
     ### YOUR CODE HERE
-    s = np.divide(1, 1 + np.exp(-x))
+    s = 1.0 / (1.0 + np.exp(-x))
     ### END YOUR CODE
 
     return s
@@ -32,9 +32,9 @@ def naiveSoftmaxLossAndGradient(centerWordVec, outsideWordIdx, outsideVectors, d
 
     Arguments:
     centerWordVec -- numpy ndarray, center word's embedding
-                    (v_c in the pdf handout)
+                    (v_c in the pdf handout) shape:(3,1)
     outsideWordIdx -- integer, the index of the outside word
-                    (o of u_o in the pdf handout)
+                    (o of u_o in the pdf handout) shape:(5,3)
     outsideVectors -- outside vectors (rows of matrix) for all words in vocab
                       (U in the pdf handout)
     dataset -- needed for negative sampling, unused here.
@@ -48,12 +48,16 @@ def naiveSoftmaxLossAndGradient(centerWordVec, outsideWordIdx, outsideVectors, d
     """
 
     ### YOUR CODE HERE
-    y_hat = softmax(np.dot(centerWordVec, outsideVectors.T))
-    loss = -np.log(y_hat[outsideWordIdx])
-    y = np.zeros_like(y_hat)
-    y[outsideWordIdx] = 1
-    gradCenterVec = np.dot((y_hat - y), outsideVectors)
-    gradOutsideVecs = np.dot((y_hat - y).reshape(-1, 1), centerWordVec.reshape(1, -1))
+    y_hat = softmax(np.dot(centerWordVec, outsideVectors.T))  # predicted scores (5,1)
+
+    loss = -np.log(y_hat[outsideWordIdx])  # get loss for context vectors
+    y_hat[outsideWordIdx] -= 1  # selecting outside word index and minus 1
+    gradCenterVec = np.dot(outsideVectors.T, y_hat)  # (3,1)
+    gradOutsideVecs = np.dot(
+        y_hat.reshape([-1, 1]), centerWordVec.reshape([1, -1])
+    )  # 5,3
+    # [-1 1] => change shape to column  vector
+    # [1 -1] => change shape to rows vector
     ### END YOUR CODE
 
     return loss, gradCenterVec, gradOutsideVecs
@@ -94,7 +98,20 @@ def negSamplingLossAndGradient(
     indices = [outsideWordIdx] + negSampleWordIndices
 
     ### YOUR CODE HERE
+    s = np.dot(
+        outsideVectors[indices], centerWordVec
+    )  # matrix of one positive and negative vectors
+    s[1:] *= -1  # beside 1st one, all are -ve sample
+    s = sigmoid(s)  # activation function
+    loss = -np.sum(np.log(s))  # calculate loss
 
+    s = 1 - s
+    s[0] *= -1
+    gradCenterVec = np.dot(s.reshape([1, -1]), outsideVectors[indices]).squeeze()
+
+    gradOutsideVecs = np.zeros_like(outsideVectors)
+    _count = np.dot(s.reshape([-1, 1]), centerWordVec.reshape([1, -1]))
+    np.add.at(gradOutsideVecs, indices, _count)
     ### Please use your implementation of sigmoid in here.
 
     ### END YOUR CODE
@@ -145,6 +162,16 @@ def skipgram(
     gradOutsideVectors = np.zeros(outsideVectors.shape)
 
     ### YOUR CODE HERE
+    center_word_indx = word2Ind[currentCenterWord]
+    centerWordVec = centerWordVectors[center_word_indx]
+
+    for w in outsideWords:
+        _loss, _gradCenterVec, _gradOutsideVectors = word2vecLossAndGradient(
+            centerWordVec, word2Ind[w], outsideVectors, dataset
+        )
+        loss += _loss
+        gradCenterVecs[center_word_indx] += _gradCenterVec
+        gradOutsideVectors += _gradOutsideVectors
 
     ### END YOUR CODE
 
