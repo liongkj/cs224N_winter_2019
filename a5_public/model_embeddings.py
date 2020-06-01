@@ -11,18 +11,19 @@ Michael Hahn <mhahn2@stanford.edu>
 """
 
 import torch.nn as nn
-
+import torch
 # Do not change these imports; your module names should be
 #   `CNN` in the file `cnn.py`
 #   `Highway` in the file `highway.py`
 # Uncomment the following two imports once you're ready to run part 1(j)
 
-# from cnn import CNN
-# from highway import Highway
+from cnn import CNN
+from highway import Highway
 
-# End "do not change" 
+# End "do not change"
 
-class ModelEmbeddings(nn.Module): 
+
+class ModelEmbeddings(nn.Module):
     """
     Class that converts input words to their CNN-based embeddings.
     """
@@ -40,7 +41,14 @@ class ModelEmbeddings(nn.Module):
         ## End A4 code
 
         ### YOUR CODE HERE for part 1j
+        self.padding = vocab.char2id['<pad>']
+        self.char_embed_size = 50
+        self.embed_size = embed_size
 
+        self.embeddings = nn.Embedding(len(vocab.char2id), self.char_embed_size, padding_idx=self.padding)
+        self.cnn_layer = CNN(out_channels=self.embed_size)
+        self.highway_layer = Highway(self.embed_size)
+        self.dropout = nn.Dropout(0.3)
 
         ### END YOUR CODE
 
@@ -59,7 +67,16 @@ class ModelEmbeddings(nn.Module):
         ## End A4 code
 
         ### YOUR CODE HERE for part 1j
+        output = []
+        for x_padded in input:
+            x_embed = self.embeddings(x_padded)
+            x_reshaped = torch.transpose(x_embed, dim0=1, dim1=2)
 
-
+            x_conv_out = self.cnn_layer(x_reshaped)
+            x_highway = self.highway_layer(x_conv_out)
+            x_word_embed = self.dropout(x_highway)
+            output.append(x_word_embed)
+        output = torch.stack(output)
+        return output
         ### END YOUR CODE
 

@@ -8,6 +8,9 @@ CS224N 2018-19: Homework 5
 import torch
 import torch.nn as nn
 
+from vocab import VocabEntry, Vocab
+
+
 class CharDecoder(nn.Module):
     def __init__(self, hidden_size, char_embedding_size=50, target_vocab=None):
         """ Init Character Decoder.
@@ -27,8 +30,14 @@ class CharDecoder(nn.Module):
         ### Hint: - Use target_vocab.char2id to access the character vocabulary for the target language.
         ###       - Set the padding_idx argument of the embedding matrix.
         ###       - Create a new Embedding layer. Do not reuse embeddings created in Part 1 of this assignment.
-        
-
+        super(CharDecoder, self).__init__()
+        self.target_vocab = target_vocab
+        self.padding_idx = target_vocab.char2id['<pad>']
+        self.charDecoder = nn.LSTM(char_embedding_size, hidden_size)
+        self.decoderCharEmb = nn.Embedding(len(target_vocab.char2id), char_embedding_size,
+                                           padding_idx=self.padding_idx)
+        self.char_output_projection = nn.Linear(hidden_size, len(target_vocab.char2id))
+        self.cross_entropy_loss = nn.CrossEntropyLoss(ignore_index=self.padding_idx, reduction='sum')
         ### END YOUR CODE
 
 
@@ -44,8 +53,11 @@ class CharDecoder(nn.Module):
         """
         ### YOUR CODE HERE for part 2b
         ### TODO - Implement the forward pass of the character decoder.
-        
-        
+        # h_state, c_state = dec_hidden
+        char_embeddings = self.decoderCharEmb(input)
+        h_state, dec_hidden = self.charDecoder(char_embeddings, dec_hidden)
+        scores = self.char_output_projection(h_state)# (length, batch, self.vocab_size)
+        return scores, dec_hidden
         ### END YOUR CODE 
 
 
@@ -53,6 +65,7 @@ class CharDecoder(nn.Module):
         """ Forward computation during training.
 
         @param char_sequence: tensor of integers, shape (length, batch). Note that "length" here and in forward() need not be the same.
+        [4, 5]
         @param dec_hidden: initial internal state of the LSTM, obtained from the output of the word-level decoder. A tuple of two tensors of shape (1, batch, hidden_size)
 
         @returns The cross-entropy loss, computed as the *sum* of cross-entropy losses of all the words in the batch.
@@ -63,7 +76,16 @@ class CharDecoder(nn.Module):
         ### Hint: - Make sure padding characters do not contribute to the cross-entropy loss.
         ###       - char_sequence corresponds to the sequence x_1 ... x_{n+1} from the handout (e.g., <START>,m,u,s,i,c,<END>).
 
+        inputs = char_sequence[:-1]  # not get last character. Why? [3,5]
+        scores, dec_hidden = self.forward(inputs, dec_hidden)  # score shape => [3,5,30]
+        score = scores.view(-1, scores.shape[-1])  # shape [15, 30]
+        # take input : (N, C), target (N)
 
+        target = char_sequence[1:].contiguous().view(-1)  # not get first character #also do not know why
+        # contiguos seems like to have a copy of the tensor and change the meta
+        # view(-1) => change [3,5] -> [15] change to one row
+
+        return self.cross_entropy_loss(score, target)
         ### END YOUR CODE
 
     def decode_greedy(self, initialStates, device, max_length=21):
@@ -83,7 +105,13 @@ class CharDecoder(nn.Module):
         ###      - Use torch.tensor(..., device=device) to turn a list of character indices into a tensor.
         ###      - We use curly brackets as start-of-word and end-of-word characters. That is, use the character '{' for <START> and '}' for <END>.
         ###        Their indices are self.target_vocab.start_of_word and self.target_vocab.end_of_word, respectively.
-        
-        
+        output_word = []
+        current_char = initialStates
+        for t in range(max_length-1):
+            h_state, c_state = self.charDecoder(current_char[t], initialStates)
+            score = self.char_output_projection(h_state)
+            current_char = torch.mul(nn.softmax(score), self.decoderCharEmb)
+            output_word += current_char
+        output_word = output_word[:, :-1]  # truncate end word
         ### END YOUR CODE
 

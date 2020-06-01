@@ -11,10 +11,12 @@ Anand Dhoot <anandd@stanford.edu>
 
 import torch.nn as nn
 
-class ModelEmbeddings(nn.Module): 
+
+class ModelEmbeddings(nn.Module):
     """
     Class that converts input words to their embeddings.
     """
+
     def __init__(self, embed_size, vocab):
         """
         Init the Embedding layers.
@@ -54,5 +56,3 @@ class ModelEmbeddings(nn.Module):
         self.target = nn.Embedding(len(vocab.tgt), self.embed_size, padding_idx=tgt_pad_token_idx)
 
         ### END YOUR CODE
-
-

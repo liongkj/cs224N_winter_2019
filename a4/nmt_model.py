@@ -62,15 +62,6 @@ class NMT(nn.Module):
         # self.target_vocab_projection (Linear Layer with no bias), called W_{vocab} in the PDF.
         # self.dropout (Dropout Layer)
         ###
-        # Use the following docs to properly initialize these variables:
-        # LSTM:
-        # https://pytorch.org/docs/stable/nn.html#torch.nn.LSTM
-        # LSTM Cell:
-        # https://pytorch.org/docs/stable/nn.html#torch.nn.LSTMCell
-        # Linear Layer:
-        # https://pytorch.org/docs/stable/nn.html#torch.nn.Linear
-        # Dropout Layer:
-        # https://pytorch.org/docs/stable/nn.html#torch.nn.Dropout
         self.encoder = nn.LSTM(embed_size, self.hidden_size,
                                bidirectional=True, bias=True)
         self.decoder = nn.LSTMCell(
@@ -321,17 +312,6 @@ class NMT(nn.Module):
         # 5. Compute tensor O_t by first applying the Tanh function and then the dropout layer.
         O_t = self.dropout(torch.tanh(V_t))
         ###
-        # Use the following docs to implement this functionality:
-        # Softmax:
-        # https://pytorch.org/docs/stable/nn.html#torch.nn.functional.softmax
-        # Batch Multiplication:
-        # https://pytorch.org/docs/stable/torch.html#torch.bmm
-        # Tensor View:
-        # https://pytorch.org/docs/stable/tensors.html#torch.Tensor.view
-        # Tensor Concatenation:
-        # https://pytorch.org/docs/stable/torch.html#torch.cat
-        # Tanh:
-        # https://pytorch.org/docs/stable/torch.html#torch.tanh
 
         # END YOUR CODE
 
