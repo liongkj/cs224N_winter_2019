@@ -125,7 +125,8 @@ class VocabEntry(object):
         ###     corresponding character indices using the character vocabulary char2id 
         ###     defined above.
         ###
-        return [[[self.start_of_word] + [self.char2id[c] for c in w] + [self.end_of_word] for w in s] for s in sents]
+        return [[[self.start_of_word]+ [self.char2id[char] for char in word] +
+                 [self.end_of_word] for word in s] for s in sents]
 
         ###     You must prepend each word with the `start_of_word` character and append 
         ###     with the `end_of_word` character. 

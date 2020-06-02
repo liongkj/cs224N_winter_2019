@@ -1,0 +1,7 @@
+{
+    "python.linting.pylintEnabled": true,
+    "python.linting.enabled": true,
+    "python.pythonPath": "/home/liongkj/anaconda3/envs/local_nmt/bin/python",
+    "python.linting.pylamaEnabled": false,
+    "python.formatting.provider": "black"
+}

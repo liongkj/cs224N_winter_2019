@@ -8,8 +8,6 @@ CS224N 2018-19: Homework 5
 import torch
 import torch.nn as nn
 
-from vocab import VocabEntry, Vocab
-
 
 class CharDecoder(nn.Module):
     def __init__(self, hidden_size, char_embedding_size=50, target_vocab=None):
@@ -19,29 +17,32 @@ class CharDecoder(nn.Module):
         @param char_embedding_size (int): dimensionality of character embeddings
         @param target_vocab (VocabEntry): vocabulary for the target language. See vocab.py for documentation.
         """
-        ### YOUR CODE HERE for part 2a
-        ### TODO - Initialize as an nn.Module.
-        ###      - Initialize the following variables:
-        ###        self.charDecoder: LSTM. Please use nn.LSTM() to construct this.
-        ###        self.char_output_projection: Linear layer, called W_{dec} and b_{dec} in the PDF
-        ###        self.decoderCharEmb: Embedding matrix of character embeddings
-        ###        self.target_vocab: vocabulary for the target language
+        # YOUR CODE HERE for part 2a
+        # TODO - Initialize as an nn.Module.
+        # - Initialize the following variables:
+        # self.charDecoder: LSTM. Please use nn.LSTM() to construct this.
+        # self.char_output_projection: Linear layer, called W_{dec} and b_{dec} in the PDF
+        # self.decoderCharEmb: Embedding matrix of character embeddings
+        # self.target_vocab: vocabulary for the target language
         ###
-        ### Hint: - Use target_vocab.char2id to access the character vocabulary for the target language.
-        ###       - Set the padding_idx argument of the embedding matrix.
-        ###       - Create a new Embedding layer. Do not reuse embeddings created in Part 1 of this assignment.
+        # Hint: - Use target_vocab.char2id to access the character vocabulary for the target language.
+        # - Set the padding_idx argument of the embedding matrix.
+        # - Create a new Embedding layer. Do not reuse embeddings created in Part 1 of this assignment.
         super(CharDecoder, self).__init__()
         self.target_vocab = target_vocab
         self.padding_idx = target_vocab.char2id['<pad>']
-        self.charDecoder = nn.LSTM(char_embedding_size, hidden_size)
-        self.decoderCharEmb = nn.Embedding(len(target_vocab.char2id), char_embedding_size,
+        V = len(target_vocab.char2id)
+
+        self.charDecoderLSTM = nn.LSTM(char_embedding_size, hidden_size)
+        self.char_output_projection = nn.Linear(
+            hidden_size, len(target_vocab.char2id))
+
+        self.decoderCharEmb = nn.Embedding(V, char_embedding_size,
                                            padding_idx=self.padding_idx)
-        self.char_output_projection = nn.Linear(hidden_size, len(target_vocab.char2id))
-        self.cross_entropy_loss = nn.CrossEntropyLoss(ignore_index=self.padding_idx, reduction='sum')
-        ### END YOUR CODE
 
+       
 
-    
+        # END YOUR CODE
     def forward(self, input, dec_hidden=None):
         """ Forward pass of character decoder.
 
@@ -51,15 +52,15 @@ class CharDecoder(nn.Module):
         @returns scores: called s_t in the PDF, shape (length, batch, self.vocab_size)
         @returns dec_hidden: internal state of the LSTM after reading the input characters. A tuple of two tensors of shape (1, batch, hidden_size)
         """
-        ### YOUR CODE HERE for part 2b
-        ### TODO - Implement the forward pass of the character decoder.
+        # YOUR CODE HERE for part 2b
+        # TODO - Implement the forward pass of the character decoder.
         # h_state, c_state = dec_hidden
         char_embeddings = self.decoderCharEmb(input)
-        h_state, dec_hidden = self.charDecoder(char_embeddings, dec_hidden)
-        scores = self.char_output_projection(h_state)# (length, batch, self.vocab_size)
+        h_state, dec_hidden = self.charDecoderLSTM(char_embeddings, dec_hidden)
+        # (length, batch, self.vocab_size)
+        scores = self.char_output_projection(h_state)
         return scores, dec_hidden
-        ### END YOUR CODE 
-
+        # END YOUR CODE
 
     def train_forward(self, char_sequence, dec_hidden=None):
         """ Forward computation during training.
@@ -70,23 +71,23 @@ class CharDecoder(nn.Module):
 
         @returns The cross-entropy loss, computed as the *sum* of cross-entropy losses of all the words in the batch.
         """
-        ### YOUR CODE HERE for part 2c
-        ### TODO - Implement training forward pass.
+        # YOUR CODE HERE for part 2c
+        # TODO - Implement training forward pass.
         ###
-        ### Hint: - Make sure padding characters do not contribute to the cross-entropy loss.
-        ###       - char_sequence corresponds to the sequence x_1 ... x_{n+1} from the handout (e.g., <START>,m,u,s,i,c,<END>).
+        # Hint: - Make sure padding characters do not contribute to the cross-entropy loss.
+        # - char_sequence corresponds to the sequence x_1 ... x_{n+1} from the handout (e.g., <START>,m,u,s,i,c,<END>).
 
         inputs = char_sequence[:-1]  # not get last character. Why? [3,5]
         scores, dec_hidden = self.forward(inputs, dec_hidden)  # score shape => [3,5,30]
-        score = scores.view(-1, scores.shape[-1])  # shape [15, 30]
-        # take input : (N, C), target (N)
 
-        target = char_sequence[1:].contiguous().view(-1)  # not get first character #also do not know why
+        target = char_sequence[1:].contiguous().view(-1) # not get first character
+        score  = scores.view(-1, scores.shape[-1])
         # contiguos seems like to have a copy of the tensor and change the meta
         # view(-1) => change [3,5] -> [15] change to one row
-
-        return self.cross_entropy_loss(score, target)
-        ### END YOUR CODE
+        cross_entropy_loss = nn.CrossEntropyLoss(
+            ignore_index=self.padding_idx, reduction='sum')
+        return cross_entropy_loss(score, target)
+        # END YOUR CODE
 
     def decode_greedy(self, initialStates, device, max_length=21):
         """ Greedy decoding
@@ -98,20 +99,34 @@ class CharDecoder(nn.Module):
                               The decoded strings should NOT contain the start-of-word and end-of-word characters.
         """
 
-        ### YOUR CODE HERE for part 2d
-        ### TODO - Implement greedy decoding.
-        ### Hints:
-        ###      - Use target_vocab.char2id and target_vocab.id2char to convert between integers and characters
-        ###      - Use torch.tensor(..., device=device) to turn a list of character indices into a tensor.
-        ###      - We use curly brackets as start-of-word and end-of-word characters. That is, use the character '{' for <START> and '}' for <END>.
-        ###        Their indices are self.target_vocab.start_of_word and self.target_vocab.end_of_word, respectively.
-        output_word = []
-        current_char = initialStates
-        for t in range(max_length-1):
-            h_state, c_state = self.charDecoder(current_char[t], initialStates)
-            score = self.char_output_projection(h_state)
-            current_char = torch.mul(nn.softmax(score), self.decoderCharEmb)
-            output_word += current_char
-        output_word = output_word[:, :-1]  # truncate end word
-        ### END YOUR CODE
+        # YOUR CODE HERE for part 2d
+        # TODO - Implement greedy decoding.
+        # Hints:
+        # - Use target_vocab.char2id and target_vocab.id2char to convert between integers and characters
+        # - Use torch.tensor(..., device=device) to turn a list of character indices into a tensor.
+        # - We use curly brackets as start-of-word and end-of-word characters. That is, use the character '{' for <START> and '}' for <END>.
+        # Their indices are self.target_vocab.start_of_word and self.target_vocab.end_of_word, respectively.
+        b = initialStates[0].shape[1]
+        dec_hidden = initialStates
 
+        start_index = self.target_vocab.start_of_word
+        end_index   = self.target_vocab.end_of_word
+
+        input = torch.tensor([start_index for _ in range(b)], device=device).unsqueeze(0)
+        decodeTuple = [["", False] for _ in range(b)]
+
+        for step in range(max_length):
+            score, dec_hidden = self.forward(input, dec_hidden) # score shape (1, b, V)
+            input = score.argmax(dim=2) # (1, b)
+
+            for str_index, char_index in enumerate(input.detach().squeeze(0)):
+                # if not reach end index:
+                if not decodeTuple[str_index][1]:
+                    if char_index != end_index:
+                        decodeTuple[str_index][0] += self.target_vocab.id2char[char_index.item()]
+                    else:
+                        decodeTuple[str_index][1] = True
+
+        decodedWords = [i[0]for i in decodeTuple]
+        return decodedWords
+        # END YOUR CODE
