@@ -7,6 +7,17 @@ Author:
 import layers
 import torch
 import torch.nn as nn
+from transformers import BertModel, BertConfig
+
+
+class Bert(nn.Module):
+    def __init__(self, word_vectors, hidden_size, drop_prob=0.):
+        super(Bert, self).__init__()
+        config = BertConfig()
+        self.model = BertModel(config)
+
+    def forward():
+        self.model.forward()
 
 
 class BiDAF(nn.Module):
@@ -29,6 +40,7 @@ class BiDAF(nn.Module):
         hidden_size (int): Number of features in the hidden state at each layer.
         drop_prob (float): Dropout probability.
     """
+
     def __init__(self, word_vectors, hidden_size, drop_prob=0.):
         super(BiDAF, self).__init__()
         self.emb = layers.Embedding(word_vectors=word_vectors,
@@ -59,13 +71,16 @@ class BiDAF(nn.Module):
         c_emb = self.emb(cw_idxs)         # (batch_size, c_len, hidden_size)
         q_emb = self.emb(qw_idxs)         # (batch_size, q_len, hidden_size)
 
-        c_enc = self.enc(c_emb, c_len)    # (batch_size, c_len, 2 * hidden_size)
-        q_enc = self.enc(q_emb, q_len)    # (batch_size, q_len, 2 * hidden_size)
+        # (batch_size, c_len, 2 * hidden_size)
+        c_enc = self.enc(c_emb, c_len)
+        # (batch_size, q_len, 2 * hidden_size)
+        q_enc = self.enc(q_emb, q_len)
 
         att = self.att(c_enc, q_enc,
                        c_mask, q_mask)    # (batch_size, c_len, 8 * hidden_size)
 
-        mod = self.mod(att, c_len)        # (batch_size, c_len, 2 * hidden_size)
+        # (batch_size, c_len, 2 * hidden_size)
+        mod = self.mod(att, c_len)
 
         out = self.out(att, mod, c_mask)  # 2 tensors, each (batch_size, c_len)
 
